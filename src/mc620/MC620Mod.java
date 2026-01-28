@@ -1,14 +1,12 @@
-package cp620;
+package mc620;
 
-import arc.util.*;
-import cp620.content.*;
 import mindustry.mod.*;
 
 
-public class CP620Mod extends Mod
+public class MC620Mod extends Mod
 {
     //public static EC620NameGenerator nameGenerator;
-    public CP620Mod()
+    public MC620Mod()
     {
         /*if(Core.app.isMobile())
         {

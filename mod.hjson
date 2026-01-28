@@ -1,16 +1,16 @@
 #the mod name as displayed in-game
-displayName: "PiggyChu620 Core Patcher v1.0"
+displayName: "Mindustry Multi Crafter v1.0"
 
-repo: "PiggyChu620/MindustryContentPatcher"
+repo: "PiggyChu620/MindustryMultiCrafter"
 
 #the internal name of your mod
-name: "cp620"
+name: "mc620"
 
 #your name
 author: "PiggyChu620"
 
 #the fully qualified main class of the mod
-main: "cp620.CP620Mod"
+main: "mc620.MC620Mod"
 
 #the mod description as seen in the mod dialog
 description: "Content patcher for PiggyChu620 mods"
