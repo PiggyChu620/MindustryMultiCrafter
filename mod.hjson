@@ -1,10 +1,10 @@
 #the mod name as displayed in-game
-displayName: "Mindustry Multi Crafter"
+displayName: "Multi Crafter"
 
 repo: "PiggyChu620/MindustryMultiCrafter"
 
 #the internal name of your mod
-name: "mc620"
+name: "pc620-multi-crafter"
 
 #your name
 author: "PiggyChu620"
