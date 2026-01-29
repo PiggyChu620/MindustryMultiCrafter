@@ -619,6 +619,42 @@ public class MultiCrafter extends Block
         }
 
         @Override
+        public boolean acceptItem(Building source, Item item)
+        {
+            if(!block.hasItems || items == null) return false;
+            MCRecipe r = currentRecipe();
+            if(r.itemInputs == null || r.itemInputs.length == 0) return false;
+
+            for(int i = 0; i < r.itemInputs.length; i++)
+            {
+                if(r.itemInputs[i].item == item)
+                {
+                    return items.get(item) < getMaximumAccepted(item);
+                }
+            }
+
+            return false;
+        }
+
+        @Override
+        public boolean acceptLiquid(Building source, Liquid liquid)
+        {
+            if(!block.hasLiquids || liquids == null) return false;
+            MCRecipe r = currentRecipe();
+            if(r.liquidInputs == null || r.liquidInputs.length == 0) return false;
+
+            for(int i = 0; i < r.liquidInputs.length; i++)
+            {
+                if(r.liquidInputs[i].liquid == liquid)
+                {
+                    return liquids.get(liquid) < block.liquidCapacity - 0.0001f;
+                }
+            }
+
+            return false;
+        }
+
+        @Override
         public float getPowerProduction()
         {
             MCRecipe r = currentRecipe();
