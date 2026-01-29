@@ -4,6 +4,7 @@ import arc.Core;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.math.geom.Geometry;
+import arc.math.geom.Point2;
 import arc.scene.style.TextureRegionDrawable;
 import arc.scene.ui.layout.Table;
 import arc.struct.ObjectSet;
@@ -49,10 +50,16 @@ import mindustry.world.meta.StatValues;
  */
 public class MultiCrafter extends Block
 {
+    private static final int ROUTE_TYPE_ITEM = 0;
+    private static final int ROUTE_TYPE_LIQUID = 1;
+
     public final Seq<MCRecipe> recipes = new Seq<MCRecipe>();
 
     /** Liquid output directions, same meaning as GenericCrafter. -1 dumps all sides. */
     public int[] liquidOutputDirections = {-1};
+
+    /** Item output directions aligned with recipe itemOutputs. -1 dumps all sides. */
+    public int[] itemOutputDirections = {-1};
 
     /** If true, multi-liquid output blocks dump excess when at least one liquid has space. */
     public boolean dumpExtraLiquid = true;
@@ -219,6 +226,11 @@ public class MultiCrafter extends Block
         config(Integer.class, (MultiCrafterBuild build, Integer value) -> {
             if(value == null) return;
             build.setRecipeIndex(value.intValue());
+        });
+
+        config(Point2.class, (MultiCrafterBuild build, Point2 value) -> {
+            if(value == null) return;
+            build.setRoute(value.x, value.y);
         });
 
         configClear((MultiCrafterBuild build) -> build.setRecipeIndex(0));
@@ -429,6 +441,38 @@ public class MultiCrafter extends Block
         return region;
     }
 
+    private static int packRoute(int type, int outputIndex, int dir)
+    {
+        return (type << 10) | ((outputIndex & 0xFF) << 2) | (dir & 0x3);
+    }
+
+    private static int routeType(int packed)
+    {
+        return (packed >> 10) & 0x3;
+    }
+
+    private static int routeIndex(int packed)
+    {
+        return (packed >> 2) & 0xFF;
+    }
+
+    private static int routeDir(int packed)
+    {
+        return packed & 0x3;
+    }
+
+    private static String dirLabel(int dir)
+    {
+        switch(dir)
+        {
+            case 0: return "F";
+            case 1: return "R";
+            case 2: return "B";
+            case 3: return "L";
+            default: return "?";
+        }
+    }
+
     public class MultiCrafterBuild extends Building implements HeatConsumer, HeatBlock
     {
         public int recipeIndex = 0;
@@ -443,6 +487,10 @@ public class MultiCrafter extends Block
 
         // heat output
         public float heatOut = 0f;
+
+        // per-recipe output routing (0-3 only)
+        private int[][] itemOutDirs;
+        private int[][] liquidOutDirs;
 
         public MCRecipe currentRecipe()
         {
@@ -462,9 +510,93 @@ public class MultiCrafter extends Block
             }
         }
 
+        private void ensureRouting()
+        {
+            if(itemOutDirs == null || itemOutDirs.length != recipes.size)
+            {
+                itemOutDirs = new int[recipes.size][];
+            }
+            if(liquidOutDirs == null || liquidOutDirs.length != recipes.size)
+            {
+                liquidOutDirs = new int[recipes.size][];
+            }
+
+            for(int i = 0; i < recipes.size; i++)
+            {
+                MCRecipe r = recipes.get(i);
+                int itemLen = r.itemOutputs == null ? 0 : r.itemOutputs.length;
+                int liquidLen = r.liquidOutputs == null ? 0 : r.liquidOutputs.length;
+
+                if(itemOutDirs[i] == null || itemOutDirs[i].length != itemLen)
+                {
+                    itemOutDirs[i] = new int[itemLen];
+                    for(int j = 0; j < itemLen; j++)
+                    {
+                        int dir = itemOutputDirections.length > j ? itemOutputDirections[j] : 0;
+                        if(dir < 0) dir = 0;
+                        itemOutDirs[i][j] = dir & 0x3;
+                    }
+                }
+
+                if(liquidOutDirs[i] == null || liquidOutDirs[i].length != liquidLen)
+                {
+                    liquidOutDirs[i] = new int[liquidLen];
+                    for(int j = 0; j < liquidLen; j++)
+                    {
+                        int dir = liquidOutputDirections.length > j ? liquidOutputDirections[j] : 0;
+                        if(dir < 0) dir = 0;
+                        liquidOutDirs[i][j] = dir & 0x3;
+                    }
+                }
+            }
+        }
+
+        private int getItemOutputDir(int recipeIdx, int outIdx)
+        {
+            ensureRouting();
+            if(recipeIdx < 0 || recipeIdx >= itemOutDirs.length) return 0;
+            if(outIdx < 0 || outIdx >= itemOutDirs[recipeIdx].length) return 0;
+            return itemOutDirs[recipeIdx][outIdx];
+        }
+
+        private int getLiquidOutputDir(int recipeIdx, int outIdx)
+        {
+            ensureRouting();
+            if(recipeIdx < 0 || recipeIdx >= liquidOutDirs.length) return 0;
+            if(outIdx < 0 || outIdx >= liquidOutDirs[recipeIdx].length) return 0;
+            return liquidOutDirs[recipeIdx][outIdx];
+        }
+
+        private void setRoute(int recipeIdx, int packed)
+        {
+            int idx = Mathf.clamp(recipeIdx, 0, recipes.size - 1);
+            int type = routeType(packed);
+            int outputIndex = routeIndex(packed);
+            int dir = routeDir(packed) & 0x3;
+
+            ensureRouting();
+
+            if(type == ROUTE_TYPE_ITEM)
+            {
+                if(outputIndex >= 0 && outputIndex < itemOutDirs[idx].length)
+                {
+                    itemOutDirs[idx][outputIndex] = dir;
+                }
+            }
+            else if(type == ROUTE_TYPE_LIQUID)
+            {
+                if(outputIndex >= 0 && outputIndex < liquidOutDirs[idx].length)
+                {
+                    liquidOutDirs[idx][outputIndex] = dir;
+                }
+            }
+        }
+
         @Override
         public void buildConfiguration(Table table)
         {
+            ensureRouting();
+
             table.table(t -> {
                 t.defaults().size(52f);
 
@@ -486,6 +618,57 @@ public class MultiCrafter extends Block
                     }
                 }
             });
+
+            table.row();
+            table.table(Styles.grayPanel, t -> {
+                t.left().top().defaults().left();
+                t.add("[lightgray]Output directions (F/R/B/L)").row();
+
+                MCRecipe r = currentRecipe();
+                int ridx = recipeIndex;
+
+                if(r.itemOutputs != null)
+                {
+                    for(int i = 0; i < r.itemOutputs.length; i++)
+                    {
+                        final int outIdx = i;
+                        ItemStack out = r.itemOutputs[i];
+                        t.table(row -> {
+                            row.left();
+                            row.image(out.item.uiIcon).size(24f).padRight(6f);
+                            for(int d = 0; d < 4; d++)
+                            {
+                                final int dir = d;
+                                row.button(dirLabel(dir), Styles.togglet, () ->
+                                    configure(new Point2(ridx, packRoute(ROUTE_TYPE_ITEM, outIdx, dir))))
+                                    .checked(b -> getItemOutputDir(ridx, outIdx) == dir)
+                                    .size(32f, 24f).padRight(2f);
+                            }
+                        }).row();
+                    }
+                }
+
+                if(r.liquidOutputs != null)
+                {
+                    for(int i = 0; i < r.liquidOutputs.length; i++)
+                    {
+                        final int outIdx = i;
+                        LiquidStack out = r.liquidOutputs[i];
+                        t.table(row -> {
+                            row.left();
+                            row.image(out.liquid.uiIcon).size(24f).padRight(6f);
+                            for(int d = 0; d < 4; d++)
+                            {
+                                final int dir = d;
+                                row.button(dirLabel(dir), Styles.togglet, () ->
+                                    configure(new Point2(ridx, packRoute(ROUTE_TYPE_LIQUID, outIdx, dir))))
+                                    .checked(b -> getLiquidOutputDir(ridx, outIdx) == dir)
+                                    .size(32f, 24f).padRight(2f);
+                            }
+                        }).row();
+                    }
+                }
+            }).growX().padTop(6f);
         }
 
         @Override
@@ -564,9 +747,10 @@ public class MultiCrafter extends Block
                 for(int o = 0; o < r.itemOutputs.length; o++)
                 {
                     ItemStack out = r.itemOutputs[o];
+                    int dir = getItemOutputDir(recipeIndex, o);
                     for(int i = 0; i < out.amount; i++)
                     {
-                        offload(out.item);
+                        offloadDirected(out.item, dir);
                     }
                 }
             }
@@ -582,6 +766,8 @@ public class MultiCrafter extends Block
 
         public void dumpOutputs()
         {
+            MCRecipe r = currentRecipe();
+
             // dump union of all possible outputs to avoid stranded items when switching recipes
             if(allOutputItems != null && timer(timerDump, dumpTime / timeScale))
             {
@@ -591,14 +777,51 @@ public class MultiCrafter extends Block
                 }
             }
 
+            // If current recipe has explicit liquid outputs, respect output directions for this recipe.
+            if(r.liquidOutputs != null && r.liquidOutputs.length > 0)
+            {
+                for(int i = 0; i < r.liquidOutputs.length; i++)
+                {
+                    int dir = getLiquidOutputDir(recipeIndex, i);
+                    dumpLiquid(r.liquidOutputs[i].liquid, 2f, dir);
+                }
+                return;
+            }
+
             if(allOutputLiquids != null)
             {
                 for(int i = 0; i < allOutputLiquids.length; i++)
                 {
-                    int dir = liquidOutputDirections.length > i ? liquidOutputDirections[i] : -1;
-                    dumpLiquid(allOutputLiquids[i], 2f, dir);
+                    dumpLiquid(allOutputLiquids[i], 2f, -1);
                 }
             }
+        }
+
+        private void offloadDirected(Item item, int outputDir)
+        {
+            if(outputDir == -1)
+            {
+                offload(item);
+                return;
+            }
+
+            produced(item, 1);
+            int dump = this.cdump;
+
+            for(int i = 0; i < proximity.size; i++)
+            {
+                incrementDump(proximity.size);
+                Building other = proximity.get((i + dump) % proximity.size);
+                if((outputDir + rotation) % 4 != relativeTo(other)) continue;
+
+                if(other.acceptItem(self(), item) && canDump(other, item))
+                {
+                    other.handleItem(self(), item);
+                    return;
+                }
+            }
+
+            handleItem(self(), item);
         }
 
         @Override
@@ -790,6 +1013,21 @@ public class MultiCrafter extends Block
             write.f(warmup);
             write.f(totalProgress);
             write.f(heatOut);
+            ensureRouting();
+            write.s(recipes.size);
+            for(int i = 0; i < recipes.size; i++)
+            {
+                write.s(itemOutDirs[i].length);
+                for(int j = 0; j < itemOutDirs[i].length; j++)
+                {
+                    write.i(itemOutDirs[i][j]);
+                }
+                write.s(liquidOutDirs[i].length);
+                for(int j = 0; j < liquidOutDirs[i].length; j++)
+                {
+                    write.i(liquidOutDirs[i][j]);
+                }
+            }
         }
 
         @Override
@@ -801,6 +1039,39 @@ public class MultiCrafter extends Block
             warmup = read.f();
             totalProgress = read.f();
             heatOut = read.f();
+            if(revision >= 1)
+            {
+                ensureRouting();
+                int recipeCount = read.s();
+                for(int i = 0; i < recipeCount; i++)
+                {
+                    int itemLen = read.s();
+                    for(int j = 0; j < itemLen; j++)
+                    {
+                        int dir = read.i() & 0x3;
+                        if(i < itemOutDirs.length && j < itemOutDirs[i].length)
+                        {
+                            itemOutDirs[i][j] = dir;
+                        }
+                    }
+
+                    int liquidLen = read.s();
+                    for(int j = 0; j < liquidLen; j++)
+                    {
+                        int dir = read.i() & 0x3;
+                        if(i < liquidOutDirs.length && j < liquidOutDirs[i].length)
+                        {
+                            liquidOutDirs[i][j] = dir;
+                        }
+                    }
+                }
+            }
+        }
+
+        @Override
+        public byte version()
+        {
+            return 1;
         }
     }
 }
