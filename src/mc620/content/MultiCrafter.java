@@ -466,10 +466,10 @@ public class MultiCrafter extends Block
     {
         switch(dir)
         {
-            case 0: return Icon.upOpen;
-            case 1: return Icon.rightOpen;
-            case 2: return Icon.downOpen;
-            case 3: return Icon.leftOpen;
+            case 0: return Icon.rightOpen;
+            case 1: return Icon.upOpen;
+            case 2: return Icon.leftOpen;
+            case 3: return Icon.downOpen;
             default: return Icon.cancel;
         }
     }
