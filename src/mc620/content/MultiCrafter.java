@@ -17,6 +17,7 @@ import mindustry.Vars;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.entities.units.BuildPlan;
+import mindustry.gen.Icon;
 import mindustry.gen.Building;
 import mindustry.graphics.Pal;
 import mindustry.logic.LAccess;
@@ -461,15 +462,15 @@ public class MultiCrafter extends Block
         return packed & 0x3;
     }
 
-    private static String dirLabel(int dir)
+    private static TextureRegionDrawable dirIcon(int dir)
     {
         switch(dir)
         {
-            case 0: return "F";
-            case 1: return "R";
-            case 2: return "B";
-            case 3: return "L";
-            default: return "?";
+            case 0: return Icon.upOpen;
+            case 1: return Icon.rightOpen;
+            case 2: return Icon.downOpen;
+            case 3: return Icon.leftOpen;
+            default: return Icon.cancel;
         }
     }
 
@@ -554,16 +555,18 @@ public class MultiCrafter extends Block
         private int getItemOutputDir(int recipeIdx, int outIdx)
         {
             ensureRouting();
-            if(recipeIdx < 0 || recipeIdx >= itemOutDirs.length) return 0;
-            if(outIdx < 0 || outIdx >= itemOutDirs[recipeIdx].length) return 0;
+            if(recipeIdx < 0 || recipeIdx >= itemOutDirs.length) return -1;
+            if(itemOutDirs[recipeIdx].length <= 1) return -1;
+            if(outIdx < 0 || outIdx >= itemOutDirs[recipeIdx].length) return -1;
             return itemOutDirs[recipeIdx][outIdx];
         }
 
         private int getLiquidOutputDir(int recipeIdx, int outIdx)
         {
             ensureRouting();
-            if(recipeIdx < 0 || recipeIdx >= liquidOutDirs.length) return 0;
-            if(outIdx < 0 || outIdx >= liquidOutDirs[recipeIdx].length) return 0;
+            if(recipeIdx < 0 || recipeIdx >= liquidOutDirs.length) return -1;
+            if(liquidOutDirs[recipeIdx].length <= 1) return -1;
+            if(outIdx < 0 || outIdx >= liquidOutDirs[recipeIdx].length) return -1;
             return liquidOutDirs[recipeIdx][outIdx];
         }
 
@@ -627,7 +630,7 @@ public class MultiCrafter extends Block
                 MCRecipe r = currentRecipe();
                 int ridx = recipeIndex;
 
-                if(r.itemOutputs != null)
+                if(r.itemOutputs != null && r.itemOutputs.length > 1)
                 {
                     for(int i = 0; i < r.itemOutputs.length; i++)
                     {
@@ -639,7 +642,7 @@ public class MultiCrafter extends Block
                             for(int d = 0; d < 4; d++)
                             {
                                 final int dir = d;
-                                row.button(dirLabel(dir), Styles.togglet, () ->
+                                row.button(dirIcon(dir), Styles.clearTogglei, () ->
                                     configure(new Point2(ridx, packRoute(ROUTE_TYPE_ITEM, outIdx, dir))))
                                     .checked(b -> getItemOutputDir(ridx, outIdx) == dir)
                                     .size(32f, 24f).padRight(2f);
@@ -648,7 +651,7 @@ public class MultiCrafter extends Block
                     }
                 }
 
-                if(r.liquidOutputs != null)
+                if(r.liquidOutputs != null && r.liquidOutputs.length > 1)
                 {
                     for(int i = 0; i < r.liquidOutputs.length; i++)
                     {
@@ -660,7 +663,7 @@ public class MultiCrafter extends Block
                             for(int d = 0; d < 4; d++)
                             {
                                 final int dir = d;
-                                row.button(dirLabel(dir), Styles.togglet, () ->
+                                row.button(dirIcon(dir), Styles.clearTogglei, () ->
                                     configure(new Point2(ridx, packRoute(ROUTE_TYPE_LIQUID, outIdx, dir))))
                                     .checked(b -> getLiquidOutputDir(ridx, outIdx) == dir)
                                     .size(32f, 24f).padRight(2f);
@@ -769,7 +772,15 @@ public class MultiCrafter extends Block
             MCRecipe r = currentRecipe();
 
             // dump union of all possible outputs to avoid stranded items when switching recipes
-            if(allOutputItems != null && timer(timerDump, dumpTime / timeScale))
+            if(r.itemOutputs != null && r.itemOutputs.length > 0 && timer(timerDump, dumpTime / timeScale))
+            {
+                for(int i = 0; i < r.itemOutputs.length; i++)
+                {
+                    int dir = getItemOutputDir(recipeIndex, i);
+                    dumpItemDirected(r.itemOutputs[i].item, dir);
+                }
+            }
+            else if(allOutputItems != null && timer(timerDump, dumpTime / timeScale))
             {
                 for(int i = 0; i < allOutputItems.length; i++)
                 {
@@ -822,6 +833,32 @@ public class MultiCrafter extends Block
             }
 
             handleItem(self(), item);
+        }
+
+        private boolean dumpItemDirected(Item item, int outputDir)
+        {
+            if(outputDir == -1)
+            {
+                return dump(item);
+            }
+            if(!block.hasItems || items.total() == 0 || proximity.size == 0 || !items.has(item)) return false;
+
+            int dump = this.cdump;
+            for(int i = 0; i < proximity.size; i++)
+            {
+                incrementDump(proximity.size);
+                Building other = proximity.get((i + dump) % proximity.size);
+                if((outputDir + rotation) % 4 != relativeTo(other)) continue;
+
+                if(other.acceptItem(self(), item) && canDump(other, item))
+                {
+                    other.handleItem(self(), item);
+                    items.remove(item, 1);
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         @Override
