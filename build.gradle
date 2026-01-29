@@ -45,7 +45,6 @@ dependencies{
     //implementation "com.github.liplum:MultiCrafterLib:v1.8"
     //implementation "com.github.piggychu620:MindustryMultiCrafter:8398894"
     //implementation 'com.google.code.gson:gson:2.10.1'
-
 }
 
 //force arc version
