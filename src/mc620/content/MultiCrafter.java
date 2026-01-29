@@ -37,6 +37,7 @@ import mindustry.world.draw.DrawBlock;
 import mindustry.world.draw.DrawDefault;
 import mindustry.world.meta.Stat;
 import mindustry.world.meta.StatUnit;
+import mindustry.world.meta.StatValues;
 
 /**
  * MultiCrafter: multiple selectable recipes in one block.
@@ -255,6 +256,90 @@ public class MultiCrafter extends Block
         {
             stats.add(Stat.output, maxHeatOut, StatUnit.heatUnits);
         }
+
+        // Detailed per-recipe I/O stats for the block info (F1).
+        stats.add(Stat.output, table -> {
+            table.row();
+            for(int i = 0; i < recipes.size; i++)
+            {
+                final int idx = i;
+                final MCRecipe r = recipes.get(i);
+                final float craftTime = Math.max(r.craftTime, 1f);
+
+                table.table(Styles.grayPanel, t -> {
+                    t.left().top().defaults().left();
+
+                    String title = r.name == null ? "Recipe " + (idx + 1) : localizeRecipeName(r.name);
+                    t.add("[accent]" + title).row();
+
+                    t.table(in -> {
+                        in.left().top();
+                        in.add("[lightgray]Inputs").row();
+
+                        boolean anyIn = false;
+
+                        if(r.itemInputs != null)
+                        {
+                            for(int j = 0; j < r.itemInputs.length; j++)
+                            {
+                                ItemStack stack = r.itemInputs[j];
+                                in.add(StatValues.displayItem(stack.item, stack.amount, craftTime, true)).padRight(5).row();
+                                anyIn = true;
+                            }
+                        }
+
+                        if(r.liquidInputs != null)
+                        {
+                            for(int j = 0; j < r.liquidInputs.length; j++)
+                            {
+                                LiquidStack stack = r.liquidInputs[j];
+                                in.add(StatValues.displayLiquid(stack.liquid, stack.amount * 60f, true)).padRight(5).row();
+                                anyIn = true;
+                            }
+                        }
+
+                        if(!anyIn)
+                        {
+                            in.add("[lightgray]None");
+                        }
+                    }).padRight(12);
+
+                    t.table(out -> {
+                        out.left().top();
+                        out.add("[lightgray]Outputs").row();
+
+                        boolean anyOut = false;
+
+                        if(r.itemOutputs != null)
+                        {
+                            for(int j = 0; j < r.itemOutputs.length; j++)
+                            {
+                                ItemStack stack = r.itemOutputs[j];
+                                out.add(StatValues.displayItem(stack.item, stack.amount, craftTime, true)).padRight(5).row();
+                                anyOut = true;
+                            }
+                        }
+
+                        if(r.liquidOutputs != null)
+                        {
+                            for(int j = 0; j < r.liquidOutputs.length; j++)
+                            {
+                                LiquidStack stack = r.liquidOutputs[j];
+                                out.add(StatValues.displayLiquid(stack.liquid, stack.amount * 60f, true)).padRight(5).row();
+                                anyOut = true;
+                            }
+                        }
+
+                        if(!anyOut)
+                        {
+                            out.add("[lightgray]None");
+                        }
+                    });
+                }).growX().pad(5);
+
+                table.row();
+            }
+        });
     }
 
     @Override
