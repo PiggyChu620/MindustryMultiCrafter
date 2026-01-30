@@ -13,7 +13,6 @@ import arc.util.Eachable;
 import arc.util.Time;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
-import mindustry.Vars;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.entities.units.BuildPlan;
@@ -28,10 +27,8 @@ import mindustry.type.LiquidStack;
 import mindustry.ui.Bar;
 import mindustry.ui.Styles;
 import mindustry.world.Block;
-import mindustry.world.Tile;
 import mindustry.world.blocks.heat.HeatBlock;
 import mindustry.world.blocks.heat.HeatConsumer;
-import mindustry.world.blocks.liquid.Conduit.ConduitBuild;
 import mindustry.world.consumers.ConsumeItemDynamic;
 import mindustry.world.consumers.ConsumeLiquidsDynamic;
 import mindustry.world.consumers.ConsumePowerDynamic;
@@ -55,12 +52,6 @@ public class MultiCrafter extends Block
     private static final int ROUTE_TYPE_LIQUID = 1;
 
     public final Seq<MCRecipe> recipes = new Seq<MCRecipe>();
-
-    /** Liquid output directions, same meaning as GenericCrafter. -1 dumps all sides. */
-    public int[] liquidOutputDirections = {-1};
-
-    /** Item output directions aligned with recipe itemOutputs. -1 dumps all sides. */
-    public int[] itemOutputDirections = {-1};
 
     /** If true, multi-liquid output blocks dump excess when at least one liquid has space. */
     public boolean dumpExtraLiquid = true;
@@ -383,24 +374,6 @@ public class MultiCrafter extends Block
                 if(out <= 0f) return 0f;
                 return b.heatOut / out;
             }));
-    }
-
-    @Override
-    public boolean rotatedOutput(int fromX, int fromY, Tile destination)
-    {
-        if(!(destination.build instanceof ConduitBuild)) return false;
-
-        Building crafter = Vars.world.build(fromX, fromY);
-        if(crafter == null) return false;
-
-        int relative = Mathf.mod(crafter.relativeTo(destination) - crafter.rotation, 4);
-        for(int i = 0; i < liquidOutputDirections.length; i++)
-        {
-            int dir = liquidOutputDirections[i];
-            if(dir == -1 || dir == relative) return false;
-        }
-
-        return true;
     }
 
     @Override
