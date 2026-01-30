@@ -533,9 +533,7 @@ public class MultiCrafter extends Block
                     itemOutDirs[i] = new int[itemLen];
                     for(int j = 0; j < itemLen; j++)
                     {
-                        int dir = itemOutputDirections.length > j ? itemOutputDirections[j] : 0;
-                        if(dir < 0) dir = 0;
-                        itemOutDirs[i][j] = dir & 0x3;
+                        itemOutDirs[i][j] = j & 0x3;
                     }
                 }
 
@@ -544,9 +542,7 @@ public class MultiCrafter extends Block
                     liquidOutDirs[i] = new int[liquidLen];
                     for(int j = 0; j < liquidLen; j++)
                     {
-                        int dir = liquidOutputDirections.length > j ? liquidOutputDirections[j] : 0;
-                        if(dir < 0) dir = 0;
-                        liquidOutDirs[i][j] = dir & 0x3;
+                        liquidOutDirs[i][j] = j & 0x3;
                     }
                 }
             }
@@ -625,7 +621,7 @@ public class MultiCrafter extends Block
             table.row();
             table.table(Styles.grayPanel, t -> {
                 t.left().top().defaults().left();
-                t.add("[lightgray]Output directions (F/R/B/L)").row();
+                t.add("[lightgray]Output directions").row();
 
                 MCRecipe r = currentRecipe();
                 int ridx = recipeIndex;
